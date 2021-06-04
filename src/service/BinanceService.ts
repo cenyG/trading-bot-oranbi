@@ -1,4 +1,5 @@
 import BinanceApi from "../api/BinanceApi";
+import {Price} from "../types";
 
 export default class BinanceService {
   binanceApi : BinanceApi
@@ -15,13 +16,12 @@ export default class BinanceService {
   }
 
   async start() {
+    await this.updatePrices()
     this.intervalId = setInterval(this.updatePrices.bind(this), this.updateDelay)
-    console.log('set', this.intervalId)
   }
 
-  async stop() {
+  stop() {
     clearInterval(this.intervalId)
-    console.log('clear', this.intervalId)
   }
 
   async updatePrices() {
@@ -34,13 +34,11 @@ export default class BinanceService {
       }
       this.prices[pair] = price
 
-      console.log(`Updated ${pair}. Bid ${price.bid}. Ask ${price.ask}`)
+      // console.log(`Updated ${pair}. Bid ${price.bid}. Ask ${price.ask}`)
     }
   }
+
+  getPrice(pair: string): Price {
+    return this.prices[pair]
+  }
 }
-
-const service = new BinanceService(['BTCUSDT'])
-service.start()
-
-setTimeout(service.stop.bind(service), 10000)
-setTimeout(()=>console.log('paka'), 20000)

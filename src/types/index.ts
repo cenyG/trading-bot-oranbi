@@ -47,3 +47,8 @@ export type MyOpenOrdersResponse = {
   entrust: Array<Order>,
   usercoin: any
 }
+
+export type Price = {
+  bid: string;
+  ask: string;
+}
