@@ -8,19 +8,34 @@ import {
   OranbiPair,
   OranbiPlaceOrderResponse
 } from "../types";
+import Logger from "../util/logger";
+import delay from "../util/wait";
 
 const querystring = require('querystring')
 
 export default class OranbiApi {
   static BASE_URL = 'https://oranbi.com'
 
+  logger: Logger
+
   ID: string
   TOKEN: string
+
+  constructor() {
+    this.logger = new Logger('ORANABI_API')
+  }
 
   async login(username: string, password: string) {
     const url = `${OranbiApi.BASE_URL}/Api/Login/login`
 
     const res = await axios.post(url, querystring.stringify({username, password}))
+
+    if (!res.data.data) {
+      this.logger.warn('login failure. retry...')
+      await delay(5000)
+
+      return await this.login(username, password)
+    }
 
     this.ID = res.data.data.ID
     this.TOKEN = res.data.data.TOKEN
@@ -36,7 +51,7 @@ export default class OranbiApi {
     return res.data.data.market
   }
 
-  async placeOrder(market: string, price: string, num: string, type: number): Promise<OranbiPlaceOrderResponse> {
+  async placeOrder(market: string, price: string, num: string, type: number): Promise<OranbiPlaceOrderResponse|void> {
     const url = `${OranbiApi.BASE_URL}/Api/Exchange/upTrade`
     // price = new BigNumber(price).toFixed(8)
 
@@ -46,10 +61,11 @@ export default class OranbiApi {
       headers: this.composeHeaders(bodyFormData)
     })
 
+    const info = `${market.toUpperCase()} ${type===1? "BUY" : "SELL"} ${num}, price: ${price}`
     if (res.data.status === 0) {
-      console.log(`[WARN:placeOrder] ${res.data.data}`)
+      return this.logger.warn(`/placeOrder ${res.data.data}, info: ${info}`)
     }
-    console.log(`[INFO:${market}] ${type===1? "BUY" : "SELL"} ${num}, price: ${price}`)
+    this.logger.info(info)
 
     return res.data
   }
@@ -62,9 +78,9 @@ export default class OranbiApi {
     })
 
     if (res.data.status === 0) {
-      console.log(`[WARN:closeOrder] ${res.data.data}`)
+      this.logger.warn(`/closeOrder ${res.data.data}`)
     }
-    console.log(`[INFO] close order ${id}`)
+    this.logger.info(`close order ${id}`)
 
     return res.data
   }
@@ -77,7 +93,7 @@ export default class OranbiApi {
     })
 
     if (res.data.status === 0) {
-      console.log(`[WARN:myOpenOrders] ${res.data.data}`)
+      this.logger.warn(`/myOpenOrders ${res.data.data}`)
     }
     return res.data.data
   }

@@ -22,6 +22,8 @@
   },
   "scripts": {
     "start": "npm run build && node build/src/workers/tradeSimulate.js",
+    "closeAll": "npm run build && node build/src/workers/closeAll.js",
+    "convertXlsx": "node util/convertXlsx.js",
     "clean": "rimraf coverage build tmp",
     "build": "tsc -p tsconfig.release.json",
     "build:watch": "tsc -w -p tsconfig.release.json",
@@ -37,6 +39,7 @@
     "dotenv": "^10.0.0",
     "form-data": "^3.0.1",
     "node-binance-api": "^0.12.5",
+    "node-xlsx": "^0.16.1",
     "querystring": "^0.2.0",
     "tslib": "~2.2.0"
   },

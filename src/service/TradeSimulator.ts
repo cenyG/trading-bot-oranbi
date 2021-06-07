@@ -6,8 +6,11 @@ import Pair from "../util/pair";
 import config from '../config'
 import {randomFloat, randomInt} from '../util/random'
 import wait from '../util/wait'
+import Logger from "../util/logger";
 
 export default class TradeSimulator {
+  logger: Logger
+
   working: boolean
   pair: Pair
   delay: number
@@ -17,6 +20,8 @@ export default class TradeSimulator {
 
 
   constructor(pair: Pair, delay = 1000) {
+    this.logger = new Logger(pair.oranbi().toUpperCase())
+
     this.working = false
     this.pair = pair
     this.delay = delay
@@ -26,7 +31,7 @@ export default class TradeSimulator {
   }
 
   async start() {
-    console.log(`[INFO] start ${this.pair.binance()} trade simulator`)
+    this.logger.info(`start trade simulator`)
 
     this.working = true
     await this.binanceService.start()
@@ -35,7 +40,7 @@ export default class TradeSimulator {
   }
 
   stop() {
-    console.log(`[INFO] stop ${this.pair.binance()} trade simulator`)
+    this.logger.info(`stop trade simulator`)
 
     this.working = false
     this.binanceService.stop()
@@ -48,12 +53,12 @@ export default class TradeSimulator {
       let {bid, ask} = this.binanceService.getPrice(this.pair.binance())
 
       bid = new BigNumber(bid)
-        .minus(new BigNumber(bid).multipliedBy(proc))                        // affected percent
+        .minus(new BigNumber(bid).multipliedBy(proc).dividedBy(100))       // affected percent
         .minus(new BigNumber(bid).multipliedBy(randomFloat(0.001, 0.005)))    // to randomize bid value
         .toString()
 
       ask = new BigNumber(ask)
-        .plus(new BigNumber(ask).multipliedBy(proc))                        // affected percent
+        .plus(new BigNumber(ask).multipliedBy(proc).dividedBy(100))        // affected percent
         .plus(new BigNumber(ask).multipliedBy(randomFloat(0.001, 0.005)))     // to randomize bid value
         .toString()
 
@@ -69,17 +74,26 @@ export default class TradeSimulator {
           break;
         case 3:
           // just do nothing , to spam more orders then close
-          // break
+          break
         case 4:
           openOrders = await this.oranbiApi.myOpenOrders(this.pair.oranbi())
-          if (openOrders.entrust.length === 0) {
-            console.warn(`[WARN] ${this.pair.binance()} no open orders`)
 
-            //place buy and sell order
+          if (!openOrders || openOrders.entrust.length === 0) {
+            this.logger.warn('no open orders')
+
+            // place buy and sell order
             await this.oranbiApi.placeOrder(this.pair.oranbi(), bid, randomFloat(min, max), 1)
             await this.oranbiApi.placeOrder(this.pair.oranbi(), ask, randomFloat(min, max), 2)
 
           } else {
+            if (openOrders.entrust.length === 10) {
+              // actually that means that is >= 10 , we spam to much
+              // close 10 orders
+              for (const order of openOrders.entrust) {
+                await this.oranbiApi.closeOrder(order.id)
+              }
+            }
+
             const randomOrderNum = randomInt(0, openOrders.entrust.length - 1)
             await this.oranbiApi.closeOrder(openOrders.entrust[randomOrderNum].id)
           }
@@ -94,18 +108,18 @@ export default class TradeSimulator {
   public async closeAllOrders() {
     await this.authOranbi()
 
-    const openOrders = await this.oranbiApi.myOpenOrders(this.pair.oranbi())
+    while (true) {
+      const openOrders = await this.oranbiApi.myOpenOrders(this.pair.oranbi())
 
-    if (openOrders.entrust.length === 0) {
-      console.log('[INFO] you have no orders')
+      if (!openOrders || openOrders.entrust.length === 0) {
+        return this.logger.info('close orders done')
+      }
+      this.logger.info(`closing ${openOrders.entrust.length} orders`)
+
+      for (const order of openOrders.entrust) {
+        await this.oranbiApi.closeOrder(order.id)
+      }
     }
-    console.log(`[INFO] closing ${openOrders.entrust.length} orders`)
-
-    for (const order of openOrders.entrust) {
-      await this.oranbiApi.closeOrder(order.id)
-    }
-
-    console.log('[INFO] close orders done')
   }
 
   private async authOranbi() {
